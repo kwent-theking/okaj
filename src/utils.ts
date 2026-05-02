@@ -123,15 +123,19 @@ export function threshold(context: CanvasRenderingContext2D, screenshot: boolean
       if (histo[i] < minHistValue) { minHistValue = histo[i]; cutAt = i }
     }
   } else {
+    // For dark-background game screenshots: find the valley between dark bg and bright text
+    // Cyberpunk UI is dark (~20-40) with bright yellow/green text (~180-230)
+    // Simple approach: find minimum in histogram between 60-180
     let minHistValue = Infinity
-    const start = Math.floor(256 * 0.3)
-    const end = Math.floor(256 * 0.9)
+    const start = Math.floor(256 * 0.25)
+    const end = Math.floor(256 * 0.70)
     for (let i = start; i <= end; i++) {
       if (histo[i] < minHistValue) { minHistValue = histo[i]; cutAt = i }
     }
   }
 
   for (let i = 0; i < data.length; i += 4) {
+    // Dark bg = 0 (black), bright text = 255 (white) — Tesseract reads white-on-black
     const v = data[i] > cutAt ? 255 : 0
     data[i] = v; data[i + 1] = v; data[i + 2] = v
   }
