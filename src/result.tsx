@@ -11,7 +11,6 @@ const byteMap: Record<string, string> = {
   F: 'FF',
 }
 
-// Colors for each step in the chosen path
 const stepColors = [
   '#ff6060', '#ffaa00', '#00e5ff', '#cfed57', '#cc77ff',
   '#ff60aa', '#60ffaa', '#6077ff', '#ffdd60', '#60ddff',
@@ -47,10 +46,12 @@ export function Result({
     if (containerRef.current) {
       setContainerWidth(containerRef.current.clientWidth)
     }
-    const obs = new ResizeObserver(entries => {
+    const el = containerRef.current
+    if (!el) return
+    const obs = new (window as any).ResizeObserver((entries: any[]) => {
       setContainerWidth(entries[0].contentRect.width)
     })
-    if (containerRef.current) obs.observe(containerRef.current)
+    obs.observe(el)
     return () => obs.disconnect()
   }, [])
 
@@ -69,12 +70,11 @@ export function Result({
       })
       return { chosenBytes, matched: new Set(chosenSeq.matchedIndices) }
     }
-    return { chosenBytes: {} as Record<string, number>, matched: new Set() }
+    return { chosenBytes: {} as Record<string, number>, matched: new Set<number>() }
   }, [matrix, targets, bufferSize, hiddenTargets, inputIsValid])
 
-  // Build cell positions for overlay
   const overlayData = useMemo(() => {
-    if (!previewUrl || !matrixBounds || !canvasWidth || !canvasHeight || !inputIsValid) return null
+    if (!previewUrl || !matrixBounds || !targetsBounds || !canvasWidth || !canvasHeight || !inputIsValid || containerWidth === 0) return null
     const scale = containerWidth / canvasWidth
     const imgHeight = canvasHeight * scale
 
@@ -93,15 +93,14 @@ export function Result({
       })
     })
 
-    // Target cells on the right
-    const tRows = targets.length
+    const tRows = targets.filter(t => !hiddenTargets.has(t.join('-'))).length
     const tCols = Math.max(...targets.map(t => t.length), 1)
-    const tCellW = (targetsBounds!.width / tCols) * scale
+    const tCellW = (targetsBounds.width / tCols) * scale
     const tCellH = tRows > 0 ? (canvasHeight / tRows) * scale : 0
     const targetCells: { tidx: number; cidx: number; x: number; y: number; w: number; h: number; byte: string; matched: boolean }[] = []
     targets.filter(t => !hiddenTargets.has(t.join('-'))).forEach((target, tidx) => {
       target.forEach((byte, cidx) => {
-        const x = targetsBounds!.left * scale + cidx * tCellW
+        const x = targetsBounds.left * scale + cidx * tCellW
         const y = tidx * tCellH
         targetCells.push({ tidx, cidx, x, y, w: tCellW, h: tCellH, byte, matched: final.matched.has(tidx) })
       })
@@ -115,12 +114,10 @@ export function Result({
       <div style={{ margin: 16, color: '#ff6060', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div>
           <b>OCR не смог распознать матрицу.</b><br />
-          Убедитесь что скриншот содержит только область взлома (матрица + цели).
+          Убедитесь что скриншот содержит область взлома (матрица + цели).
           {previewUrl && (
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: '0.8em', color: '#ff606080', marginBottom: 4 }}>
-                Вот что было передано в OCR:
-              </div>
+              <div style={{ fontSize: '0.8em', color: '#ff606080', marginBottom: 4 }}>Что получил OCR:</div>
               <img src={previewUrl} style={{ maxWidth: '100%', border: '1px solid #ff606060' }} />
             </div>
           )}
@@ -132,9 +129,8 @@ export function Result({
 
   return (
     <>
-      {/* Overlay preview */}
       {previewUrl && overlayData && (
-        <div style={{ margin: 8, position: 'relative' }} ref={containerRef}>
+        <div style={{ margin: 8 }} ref={containerRef}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: '0.7em', color: '#cfed57' }}>
             <span>ДЕТЕКТ НА СКРИНЕ</span>
             <a href="#" style={{ color: '#cfed5780' }} onClick={e => { e.preventDefault(); setShowOverlay(!showOverlay) }}>
@@ -143,82 +139,52 @@ export function Result({
           </div>
           {showOverlay && (
             <div style={{ position: 'relative', width: '100%' }}>
-              <img src={previewUrl} style={{ width: '100%', display: 'block', filter: 'brightness(0.5)' }} />
+              <img src={previewUrl} style={{ width: '100%', display: 'block', filter: 'brightness(0.45)' }} />
               <svg
                 style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
                 viewBox={`0 0 ${containerWidth} ${overlayData.imgHeight}`}
               >
-                {/* Matrix cells */}
                 {overlayData.cells.map(cell => {
                   const isChosen = cell.stepIndex !== undefined
-                  const color = isChosen ? stepColors[cell.stepIndex % stepColors.length] : '#cfed5740'
+                  const color = isChosen ? stepColors[cell.stepIndex! % stepColors.length] : '#cfed5740'
                   return (
                     <g key={`m-${cell.row}-${cell.col}`}>
-                      <rect
-                        x={cell.x + 1} y={cell.y + 1}
-                        width={cell.w - 2} height={cell.h - 2}
-                        fill={isChosen ? color + '30' : 'none'}
-                        stroke={color}
-                        strokeWidth={isChosen ? 2 : 0.5}
-                        rx={2}
-                      />
-                      <text
-                        x={cell.x + cell.w / 2}
-                        y={cell.y + cell.h / 2 + 1}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
+                      <rect x={cell.x + 1} y={cell.y + 1} width={cell.w - 2} height={cell.h - 2}
+                        fill={isChosen ? color + '30' : 'none'} stroke={color}
+                        strokeWidth={isChosen ? 2 : 0.5} rx={2} />
+                      <text x={cell.x + cell.w / 2} y={cell.y + cell.h / 2 + 1}
+                        textAnchor="middle" dominantBaseline="middle"
                         fill={isChosen ? color : '#cfed5790'}
                         fontSize={Math.max(cell.h * 0.38, 8)}
-                        fontWeight={isChosen ? 'bold' : 'normal'}
-                        fontFamily="monospace"
-                      >
+                        fontWeight={isChosen ? 'bold' : 'normal'} fontFamily="monospace">
                         {byteMap[cell.byte]}
                       </text>
                       {isChosen && (
-                        <text
-                          x={cell.x + cell.w - 3}
-                          y={cell.y + 4}
-                          textAnchor="end"
-                          dominantBaseline="hanging"
-                          fill={color}
-                          fontSize={Math.max(cell.h * 0.22, 6)}
-                          fontFamily="monospace"
-                          fontWeight="bold"
-                        >
+                        <text x={cell.x + cell.w - 3} y={cell.y + 4}
+                          textAnchor="end" dominantBaseline="hanging"
+                          fill={color} fontSize={Math.max(cell.h * 0.22, 6)}
+                          fontFamily="monospace" fontWeight="bold">
                           {cell.stepIndex! + 1}
                         </text>
                       )}
                     </g>
                   )
                 })}
-                {/* Target cells */}
                 {overlayData.targetCells.map(cell => {
                   const color = cell.matched ? '#cfed57' : '#ffffff40'
                   return (
                     <g key={`t-${cell.tidx}-${cell.cidx}`}>
-                      <rect
-                        x={cell.x + 1} y={cell.y + 1}
-                        width={cell.w - 2} height={cell.h - 2}
-                        fill={cell.matched ? '#cfed5715' : 'none'}
-                        stroke={color}
-                        strokeWidth={cell.matched ? 1.5 : 0.5}
-                        rx={2}
-                      />
-                      <text
-                        x={cell.x + cell.w / 2}
-                        y={cell.y + cell.h / 2 + 1}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill={color}
-                        fontSize={Math.max(cell.h * 0.38, 8)}
-                        fontFamily="monospace"
-                      >
+                      <rect x={cell.x + 1} y={cell.y + 1} width={cell.w - 2} height={cell.h - 2}
+                        fill={cell.matched ? '#cfed5715' : 'none'} stroke={color}
+                        strokeWidth={cell.matched ? 1.5 : 0.5} rx={2} />
+                      <text x={cell.x + cell.w / 2} y={cell.y + cell.h / 2 + 1}
+                        textAnchor="middle" dominantBaseline="middle"
+                        fill={color} fontSize={Math.max(cell.h * 0.38, 8)} fontFamily="monospace">
                         {byteMap[cell.byte]}
                       </text>
                     </g>
                   )
                 })}
-                {/* Step order arrows / connectors */}
                 {(() => {
                   const ordered = Object.entries(final.chosenBytes)
                     .sort((a, b) => a[1] - b[1])
@@ -231,15 +197,8 @@ export function Result({
                     const next = ordered[i + 1]
                     const color = stepColors[i % stepColors.length]
                     return (
-                      <line
-                        key={`line-${i}`}
-                        x1={pt.cx} y1={pt.cy}
-                        x2={next.cx} y2={next.cy}
-                        stroke={color}
-                        strokeWidth={1.5}
-                        strokeDasharray="4 3"
-                        opacity={0.7}
-                      />
+                      <line key={`line-${i}`} x1={pt.cx} y1={pt.cy} x2={next.cx} y2={next.cy}
+                        stroke={color} strokeWidth={1.5} strokeDasharray="4 3" opacity={0.7} />
                     )
                   })
                 })()}
@@ -249,59 +208,25 @@ export function Result({
         </div>
       )}
 
-      {/* Matrix result */}
-      <div
-        style={{
-          margin: 8,
-          border: '1px solid #cfed5780',
-          backgroundColor: '#120f18',
-          paddingBottom: 8,
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#cfed57',
-            color: 'black',
-            padding: '4px 16px',
-            marginBottom: 8,
-          }}
-        >
+      <div style={{ margin: 8, border: '1px solid #cfed5780', backgroundColor: '#120f18', paddingBottom: 8 }}>
+        <div style={{ backgroundColor: '#cfed57', color: 'black', padding: '4px 16px', marginBottom: 8 }}>
           BEST ROUTE
         </div>
         {matrix.map((line, row) => (
-          <div
-            style={{ display: 'flex', justifyContent: 'center' }}
-            key={`${line.join('-')}-${row}`}
-          >
+          <div style={{ display: 'flex', justifyContent: 'center' }} key={`${line.join('-')}-${row}`}>
             {line.map((byte, col) => {
               const index = final.chosenBytes[`${row},${col}`]
               const color = index !== undefined ? stepColors[index % stepColors.length] : '#ccee7060'
               return (
-                <span
-                  style={{
-                    position: 'relative',
-                    display: 'inline-flex',
-                    color,
-                    fontSize: '1.2em',
-                    textTransform: 'uppercase',
-                    width: 40,
-                    height: 32,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    fontWeight: index !== undefined ? 'bold' : 'normal',
-                  }}
-                  key={`${byte}-${col}`}
-                >
+                <span style={{
+                  position: 'relative', display: 'inline-flex', color,
+                  fontSize: '1.2em', textTransform: 'uppercase',
+                  width: 40, height: 32, justifyContent: 'center', alignItems: 'center',
+                  fontWeight: index !== undefined ? 'bold' : 'normal',
+                }} key={`${byte}-${col}`}>
                   {byteMap[byte]}
                   {index !== undefined && (
-                    <span
-                      style={{
-                        position: 'absolute',
-                        fontSize: '0.6em',
-                        top: 0,
-                        right: 0,
-                      }}
-                    >
+                    <span style={{ position: 'absolute', fontSize: '0.6em', top: 0, right: 0 }}>
                       {index + 1}
                     </span>
                   )}
@@ -312,86 +237,43 @@ export function Result({
         ))}
       </div>
 
-      {/* Targets */}
-      <div
-        style={{
-          margin: 8,
-          marginTop: 0,
-          border: '1px solid #cfed5780',
-          backgroundColor: '#120f18',
-          paddingBottom: 8,
-        }}
-      >
-        <div
-          style={{
-            color: '#cfed57',
-            padding: '4px 16px',
-            marginBottom: 8,
-            borderBottom: '1px solid #cfed5780',
-          }}
-        >
+      <div style={{ margin: 8, marginTop: 0, border: '1px solid #cfed5780', backgroundColor: '#120f18', paddingBottom: 8 }}>
+        <div style={{ color: '#cfed57', padding: '4px 16px', marginBottom: 8, borderBottom: '1px solid #cfed5780' }}>
           TARGET SEQUENCES
         </div>
-        {targets
-          .filter(target => !hiddenTargets.has(target.join('-')))
-          .map((target, i) => (
-            <div style={{ paddingLeft: 16 }} key={target.join('-')}>
-              {target.map((byte, j) => (
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    color: final.matched.has(i) ? '#cfed57' : '#FFFFFF40',
-                    fontSize: '1.1em',
-                    textTransform: 'uppercase',
-                    width: 32,
-                    height: 28,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
-                  key={`${byte}-${j}`}
-                >
-                  {byteMap[byte]}
-                </div>
-              ))}
-              <a
-                style={{
-                  display: 'float',
-                  float: 'right',
-                  marginRight: 16,
-                  color: '#cfed57',
-                }}
-                onClick={() => {
-                  setHiddenTargets(new Set(hiddenTargets).add(target.join('-')))
-                }}
-                href="#"
-              >
-                Remove
-              </a>
-            </div>
-          ))}
+        {targets.filter(target => !hiddenTargets.has(target.join('-'))).map((target, i) => (
+          <div style={{ paddingLeft: 16 }} key={target.join('-')}>
+            {target.map((byte, j) => (
+              <div style={{
+                display: 'inline-flex',
+                color: final.matched.has(i) ? '#cfed57' : '#FFFFFF40',
+                fontSize: '1.1em', textTransform: 'uppercase',
+                width: 32, height: 28, justifyContent: 'center', alignItems: 'center',
+              }} key={`${byte}-${j}`}>
+                {byteMap[byte]}
+              </div>
+            ))}
+            <a style={{ display: 'float', float: 'right', marginRight: 16, color: '#cfed57' }}
+              onClick={() => { setHiddenTargets(new Set(hiddenTargets).add(target.join('-'))) }}
+              href="#">
+              Remove
+            </a>
+          </div>
+        ))}
       </div>
 
       <div style={{ marginLeft: 8, color: '#cfed57' }}>
         <label>BUFFER SIZE:</label>
-        <input
-          type="number"
-          min={2}
-          max={9}
-          name="buffer-size"
-          style={{ marginLeft: 8 }}
-          value={bufferSize}
+        <input type="number" min={2} max={9} name="buffer-size"
+          style={{ marginLeft: 8 }} value={bufferSize}
           onChange={e => {
             const bs = Math.min(Math.max(parseInt(e.target.value, 10), 4), 9)
             setBufferSize(bs)
             window.localStorage.setItem('buffer_size', `${bs}`)
-          }}
-        />
+          }} />
       </div>
 
-      <button
-        style={{ margin: 'auto', marginBottom: 16 }}
-        onClick={onStartOver}
-      >
+      <button style={{ margin: 'auto', marginBottom: 16 }} onClick={onStartOver}>
         START OVER
       </button>
     </>
