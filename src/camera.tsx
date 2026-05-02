@@ -305,7 +305,7 @@ export function Camera({
                     Android user: If none of the options above work, please
                     check{' '}
                     <a
-                      href="https://github.com/govizlora/optical-breacher/issues/7"
+                      href="https://github.com/kwent-theking/okaj/issues"
                       target="_blank"
                       rel="noopener"
                     >

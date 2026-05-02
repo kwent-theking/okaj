@@ -16,11 +16,6 @@ export type Logger = (packet: {
   progress?: number
 }) => void
 
-// For a screenshot or mobile photo that meets the requirement,
-// the safest ratio that cuts the 2
-// (65% for the matrix and 35% for the target sequences)
-const cutRatio = 0.65
-
 export class OCR {
   private matrixWorker: Promise<Worker>
   private targetsWorker: Promise<Worker>
@@ -42,20 +37,18 @@ export class OCR {
       (await this.matrixWorker).terminate,
     ])
 
-  // Multiple Rectangles (with scheduler to do recognition in parallel):
-  // https://github.com/naptha/tesseract.js/blob/master/docs/examples.md
-  public async recognize(image: ImageLike, width: number, height: number) {
+  public async recognize(image: ImageLike, width: number, height: number, cutRatio: number = 0.58) {
     const matrixWorker = await this.matrixWorker
     const targetsWorker = await this.targetsWorker
     const results = await Promise.all([
       matrixWorker.recognize(image, {
-        rectangle: { left: 0, top: 0, width: width * cutRatio, height },
+        rectangle: { left: 0, top: 0, width: Math.round(width * cutRatio), height },
       }),
       targetsWorker.recognize(image, {
         rectangle: {
-          left: width * cutRatio,
+          left: Math.round(width * cutRatio),
           top: 0,
-          width: width * (1 - cutRatio),
+          width: Math.round(width * (1 - cutRatio)),
           height,
         },
       }),

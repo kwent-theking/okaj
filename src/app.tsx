@@ -11,18 +11,23 @@ const defaultOcrResult: {
   matrix: string[][]
   targets: string[][]
   finished: boolean
+  previewUrl?: string
+  matrixBounds?: { left: number; top: number; width: number; height: number }
+  targetsBounds?: { left: number; top: number; width: number; height: number }
+  canvasWidth?: number
+  canvasHeight?: number
 } = { matrix: [], targets: [], finished: false }
+
 const parser = new UAParser()
 const deviceType = parser.getDevice()?.type
+
+export const CUT_RATIO = 0.58
 
 export default function App() {
   const OCRref = useRef<OCR>()
   const [ocrResult, setOcrResult] = useState(defaultOcrResult)
   const [ocrProgress, setOcrProgress] = useState(defaultOcrProgress)
   const [showInputPage, setShowInputPage] = useState(true)
-  // const canvasRef = useRef<HTMLCanvasElement>(null)
-  // const [outputs, setOutputs] = useState<string[]>([])
-
   const [isMobile, setIsMobile] = useState(
     deviceType === 'mobile' || deviceType === 'tablet'
   )
@@ -44,69 +49,50 @@ export default function App() {
     }
   }, [])
 
-  // Run the OCR and data cleaning.
-  const onCapture = useCallback(async canvas => {
+  const onCapture = useCallback(async (canvas: HTMLCanvasElement) => {
     setShowInputPage(false)
     setOcrProgress(defaultOcrProgress)
     setOcrResult(defaultOcrResult)
-    const result = await OCRref.current!.recognize(
-      canvas,
-      canvas.width,
-      canvas.height
-    )
+
+    const previewUrl = canvas.toDataURL('image/png')
+    const w = canvas.width
+    const h = canvas.height
+
+    const result = await OCRref.current!.recognize(canvas, w, h, CUT_RATIO)
     const { lines: matrix, chars } = processMatrix(result.matrixData.text)
     const targets = processTargets(result.targetsData.text, chars)
-    setOcrResult({ matrix, targets, finished: true })
-    // setOutputs([
-    //   'Matrix:',
-    //   ...result.matrixData.text.split('\n'),
-    //   '===result:',
-    //   ...matrix.map(l => l.join(' ')),
-    //   'Targets',
-    //   ...result.targetsData.text.split('\n'),
-    //   '===result:',
-    //   ...processTargets(result.targetsData.text, chars).map(l => l.join(' '))
-    // ]);
-    // if (canvasRef.current) {
-    //   canvasRef.current.width = canvas.width
-    //   canvasRef.current.height = canvas.height
-    //   canvasRef.current.getContext('2d')?.drawImage(canvas, 0, 0)
-    // }
+
+    setOcrResult({
+      matrix,
+      targets,
+      finished: true,
+      previewUrl,
+      canvasWidth: w,
+      canvasHeight: h,
+      matrixBounds: { left: 0, top: 0, width: Math.round(w * CUT_RATIO), height: h },
+      targetsBounds: { left: Math.round(w * CUT_RATIO), top: 0, width: Math.round(w * (1 - CUT_RATIO)), height: h },
+    })
   }, [])
 
-  // For screenshots.
-  // Convert the file to OCR ready image
   const handleFile = useCallback(
     async (file: File) => {
       const image = await createImageBitmap(file)
-      // const canvas = canvasRef.current!
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')!
-      canvas.width = Math.min(image.width, 1280)
-      canvas.height = (canvas.width / image.width) * image.height
-      ctx.drawImage(
-        image,
-        0,
-        0,
-        image.width,
-        image.height,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      )
+      // Upscale small images so OCR works on low-res shots too
+      const minWidth = 1280
+      canvas.width = Math.max(image.width, minWidth)
+      canvas.height = Math.round((canvas.width / image.width) * image.height)
+      ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, canvas.width, canvas.height)
       threshold(ctx, true)
       onCapture(canvas)
     },
     [onCapture]
   )
 
-  // Support Ctrl + V anywhere
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
-      if (isMobile) {
-        return
-      }
+      if (isMobile) return
       e.preventDefault()
       const item = e.clipboardData?.items?.[0]
       const file = item?.kind === 'file' ? item.getAsFile() : null
@@ -144,6 +130,11 @@ export default function App() {
           <Result
             matrix={ocrResult.matrix}
             targets={ocrResult.targets}
+            previewUrl={ocrResult.previewUrl}
+            matrixBounds={ocrResult.matrixBounds}
+            targetsBounds={ocrResult.targetsBounds}
+            canvasWidth={ocrResult.canvasWidth}
+            canvasHeight={ocrResult.canvasHeight}
             onStartOver={() => {
               setShowInputPage(true)
             }}
@@ -158,10 +149,6 @@ export default function App() {
             }
           />
         )}
-        {/* <div>
-          <canvas ref={canvasRef} />
-        </div> */}
-        {/* outputs.map(o => <div>{o}</div>) */}
       </div>
 
       <div
@@ -173,10 +160,10 @@ export default function App() {
           color: '#ff6060a0',
         }}
       >
-        <span style={{ marginRight: 4 }}>OPTICAL BREACHER MK.1 Rev 1.9</span>
+        <span style={{ marginRight: 4 }}>OKAJ BREACHER by Kwent</span>
         <a
           style={{ marginLeft: 'auto', color: 'inherit' }}
-          href="https://github.com/govizlora/optical-breacher"
+          href="https://github.com/kwent-theking/okaj"
           rel="noopener"
           target="_blank"
         >

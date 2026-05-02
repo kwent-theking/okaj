@@ -27,33 +27,24 @@ export const Upload = ({
           ...(isDragOn && { backgroundColor: '#ff606020' }),
         }}
         className="dropzone"
-        onDragOver={e => {
-          e.preventDefault()
-        }}
-        onDragEnter={e => {
-          e.target === e.currentTarget && setIsDragOn(true)
-        }}
-        onDragLeave={e => {
-          e.target === e.currentTarget && setIsDragOn(false)
-        }}
+        onDragOver={e => { e.preventDefault() }}
+        onDragEnter={e => { e.target === e.currentTarget && setIsDragOn(true) }}
+        onDragLeave={e => { e.target === e.currentTarget && setIsDragOn(false) }}
         onDrop={async e => {
           setIsDragOn(false)
           e.preventDefault()
           const item = e.dataTransfer?.items?.[0]
           const file = item.kind === 'file' ? item.getAsFile() : null
-          file &&
-            handleFile(file).catch(() => {
-              setErr('Invalid image')
-            })
+          file && handleFile(file).catch(() => { setErr('Не удалось обработать изображение') })
         }}
       >
         <div style={{ pointerEvents: 'none' }}>
-          <div>To start, you can:</div>
-          <div>- Drag an image into the box</div>
-          <div>- or click the box to upload an image</div>
-          <div>
-            - or make an in-game screenshot using WIN + SHIFT + S, then CTRL + V
-            here
+          <div>Чтобы начать:</div>
+          <div>— Перетащи скрин сюда</div>
+          <div>— или нажми чтобы загрузить файл</div>
+          <div>— или сделай скрин через WIN + SHIFT + S, потом CTRL + V сюда</div>
+          <div style={{ marginTop: 8, color: '#cfed5780', fontSize: '0.85em' }}>
+            Обрезка не обязательна — OCR работает с полными скринами.
           </div>
         </div>
 
@@ -63,38 +54,29 @@ export const Upload = ({
           style={{ display: 'none' }}
           onChange={e => {
             const file = e.target.files?.[0]
-            file &&
-              handleFile(file).catch(() => {
-                setErr('Invalid image')
-              })
+            file && handleFile(file).catch(() => { setErr('Не удалось обработать изображение') })
           }}
         />
       </label>
-      {err && <div style={{ marginLeft: 16 }}>Error: {err}</div>}
+      {err && <div style={{ marginLeft: 16, color: '#ff6060' }}>Ошибка: {err}</div>}
       <div style={{ margin: '0 16px' }}>
-        Please crop the screenshot before uploading.
         <a
-          style={{ marginLeft: 4 }}
+          style={{ marginLeft: 0 }}
           href="#"
-          onClick={() => {
-            setExampleOn(!exampleOn)
-          }}
+          onClick={() => { setExampleOn(!exampleOn) }}
         >
-          {exampleOn ? 'Hide' : 'Show'} the example
+          {exampleOn ? 'Скрыть' : 'Показать'} пример обрезки
         </a>
         {exampleOn && (
           <div>
-            <img
-              style={{ maxHeight: 240, maxWidth: '100%' }}
-              src={exampleImg}
-            />
+            <img style={{ maxHeight: 240, maxWidth: '100%' }} src={exampleImg} />
           </div>
         )}
       </div>
       <div style={{ margin: '8px 16px' }}>
-        Alternatively, you can{' '}
+        Или{' '}
         <a href="#" onClick={toCameraMode}>
-          use the camera
+          использовать камеру
         </a>
       </div>
     </>
