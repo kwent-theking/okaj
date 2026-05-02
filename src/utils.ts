@@ -21,7 +21,10 @@ const TOKEN_CORRECTIONS: Record<string, string> = {
   SS: '5', ss: '5', S5: '5', '5S': '5', Ss: '5', GG: '5', G5: '5', '5G': '5',
   E9: 'E', e9: 'E', '39': 'E', Eg: 'E', EG: 'E', eq: 'E', EQ: 'E',
   FF: 'F', Ff: 'F', fF: 'F', ff: 'F', FP: 'F', fp: 'F', pF: 'F',
-  '7a': '7', '7A': '7', TA: '7', Ta: '7', ZA: '7', Za: '7',
+  '7a': '7', '7A': '7', TA: '7', Ta: '7', ZA: '7', Za: '7', 'E9': '1',  // E9 часто читается вместо 1C
+  'E0': '1',
+'69': '7',  // 7A путается
+'6A': '7',
 }
 
 const VALID_CHARS = new Set(['1', 'B', '5', 'E', 'F', '7'])
