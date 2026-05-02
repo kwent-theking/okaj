@@ -15,16 +15,25 @@ const CHAR_CORRECTIONS: Record<string, string> = {
   '/': '7', T: '7', t: '7', Z: '7', z: '7', '?': '7', Y: '7',
 }
 
+// TOKEN_CORRECTIONS: full 2-char token → first valid char of the byte
+// Keys are what Tesseract actually outputs, values are the internal single-char code
 const TOKEN_CORRECTIONS: Record<string, string> = {
+  // 1C variants
   lC: '1', IC: '1', iC: '1', '1c': '1', Ic: '1', lc: '1',
+  // BD variants
   '8D': 'B', '8d': 'B', BD: 'B', Bd: 'B', bD: 'B', bd: 'B', '6D': 'B', Bo: 'B', B0: 'B',
+  // 55 variants
   SS: '5', ss: '5', S5: '5', '5S': '5', Ss: '5', GG: '5', G5: '5', '5G': '5',
-  E9: 'E', e9: 'E', '39': 'E', Eg: 'E', EG: 'E', eq: 'E', EQ: 'E',
+  // E9 variants — NOTE: do NOT add E9→'1' here, E9 is a valid token
+  e9: 'E', '39': 'E', Eg: 'E', EG: 'E', eq: 'E', EQ: 'E', E0: 'E', Eo: 'E',
+  // FF variants
   FF: 'F', Ff: 'F', fF: 'F', ff: 'F', FP: 'F', fp: 'F', pF: 'F',
-  '7a': '7', '7A': '7', TA: '7', Ta: '7', ZA: '7', Za: '7', 'E9': '1',  // E9 часто читается вместо 1C
-  'E0': '1',
-'69': '7',  // 7A путается
-'6A': '7',
+  // 7A variants
+  '7a': '7', '7A': '7', TA: '7', Ta: '7', ZA: '7', Za: '7',
+  // Common misreads of 1C as something else
+  EC: '1', eC: '1', Ec: '1', ec: '1',
+  // Common misreads of 7A
+  '6A': '7', '6a': '7', GA: '7', Ga: '7',
 }
 
 const VALID_CHARS = new Set(['1', 'B', '5', 'E', 'F', '7'])
@@ -126,9 +135,6 @@ export function threshold(context: CanvasRenderingContext2D, screenshot: boolean
       if (histo[i] < minHistValue) { minHistValue = histo[i]; cutAt = i }
     }
   } else {
-    // For dark-background game screenshots: find the valley between dark bg and bright text
-    // Cyberpunk UI is dark (~20-40) with bright yellow/green text (~180-230)
-    // Simple approach: find minimum in histogram between 60-180
     let minHistValue = Infinity
     const start = Math.floor(256 * 0.25)
     const end = Math.floor(256 * 0.70)
@@ -138,7 +144,6 @@ export function threshold(context: CanvasRenderingContext2D, screenshot: boolean
   }
 
   for (let i = 0; i < data.length; i += 4) {
-    // Dark bg = 0 (black), bright text = 255 (white) — Tesseract reads white-on-black
     const v = data[i] > cutAt ? 255 : 0
     data[i] = v; data[i + 1] = v; data[i + 2] = v
   }
