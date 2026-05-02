@@ -21,7 +21,7 @@ const defaultOcrResult: {
 const parser = new UAParser()
 const deviceType = parser.getDevice()?.type
 
-export const CUT_RATIO = 0.58
+export const CUT_RATIO = 0.52
 
 export default function App() {
   const OCRref = useRef<OCR>()
